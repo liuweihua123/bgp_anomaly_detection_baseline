@@ -11,9 +11,8 @@ BGP 路由异常检测与劫持检测基线集合。本仓库汇总了多种具�
 | --- | --- | --- | --- | --- |
 | [Artemis](Artemis/) | BGP 劫持实时检测与缓解 | ARTEMIS Helm Chart | [部署说明](Artemis/README.md)、[`values.yaml`](Artemis/values.yaml) | 当前目录主要是 Kubernetes/Helm 部署文件，不是完整的 Docker Compose 源码树 |
 | [BEAM](BEAM/) | 路由异常检测与告警聚合 | 语义感知的 AS 路径差异建模 | [完整流程](BEAM/readme.md)、[`BEAM_engine/train.py`](BEAM/BEAM_engine/train.py) | 训练依赖 CAIDA AS 关系数据和 CUDA；监控流程需要 RouteViews 数据 |
-| [BGP2Vec](BGP2Vec/) | AS 表示学习、AS 关系/类型分类 | 基于 BGP 路径的 Word2Vec 嵌入 | [方法与数据说明](BGP2Vec/README.md)、[`bgp2vec.py`](BGP2Vec/bgp2vec.py) | 依赖较旧；`requirements.txt` 是完整历史环境快照，不建议直接装入现有环境 |
 | [BGPgraph](BGPgraph/) | 异常检测、类型识别与异常 AS 定位 | TIFS 2025；带节点/边属性的 GCN 与自编码器 | [工程说明](BGPgraph/README.md)、[`DetectionLocation/`](BGPgraph/DetectionLocation/) | 部分路径和本地模块需要补齐后才能运行，详见下文 |
-| [BGPvector](BGPvector/) | BGP2Vec/AP2Vec 相关表示学习实验 | BGP2Vec 代码、样例关系数据与预训练模型 | [子工程说明](BGPvector/BGP2Vec/README.md)、[`train_test.py`](BGPvector/BGP2Vec/train_test.py) | 与 `BGP2Vec/` 有重叠；当前内容以 BGP2Vec 训练和向量查询为主 |
+| [BGPvector](BGPvector/) | AS 表示学习、AS 关系/类型分类 | 基于 BGP 路径的 BGP2Vec/Word2Vec 嵌入 | [方法与数据说明](BGPvector/BGP2Vec/README.md)、[`bgp2vec.py`](BGPvector/BGP2Vec/bgp2vec.py)、[`train_test.py`](BGPvector/BGP2Vec/train_test.py) | 包含样例数据和预训练模型；依赖版本较旧，建议使用独立环境 |
 | [ISP-Operated](ISP-Operated/) | ISP 自运营异常检测 | 滑动窗口、SA-LSTM、弱监督分类 | [`dataset.py`](ISP-Operated/dataset.py) → [`classification.py`](ISP-Operated/classification.py) → [`predict.py`](ISP-Operated/predict.py) | 脚本含原实验环境的绝对路径，需要先改为本地数据、日志和模型路径 |
 | [MSLSTM](MSLSTM/) | BGP 异常分类 | 多尺度小波特征与 LSTM | [`feature_extraction.py`](MSLSTM/sendXiaohui/feature_extraction.py) → [`classification.py`](MSLSTM/sendXiaohui/classification.py) → [`test_model.py`](MSLSTM/sendXiaohui/test_model.py) | 脚本含绝对路径，训练默认使用 GPU；运行前需准备 JSON 特征和模型目录 |
 
@@ -23,9 +22,8 @@ BGP 路由异常检测与劫持检测基线集合。本仓库汇总了多种具�
 BGP-Baseline/
 ├── Artemis/          # ARTEMIS 的 Helm 部署配置
 ├── BEAM/             # 语义感知的路由异常检测流水线
-├── BGP2Vec/          # 独立的 BGP2Vec 实现与实验 Notebook
 ├── BGPgraph/         # 图构建、GCN 检测及异常定位
-├── BGPvector/        # BGP2Vec/AP2Vec 相关实验材料和预训练模型
+├── BGPvector/        # BGP2Vec 实现、实验 Notebook、数据与预训练模型
 ├── ISP-Operated/     # ISP 自运营弱监督检测代码
 ├── MSLSTM/           # 多尺度 LSTM 特征、训练与测试代码
 └── README.md
@@ -49,7 +47,7 @@ source .venv/bin/activate
 
 随后进入目标子目录，根据其 README、导入项及实际硬件安装依赖。尤其需要注意：
 
-- `BGP2Vec/requirements.txt` 固定了较旧的完整 Anaconda 环境，其中包含平台相关包；优先在隔离的旧版 Python 环境中按需安装核心依赖。
+- `BGPvector/BGP2Vec/requirements.txt` 固定了较旧的完整 Anaconda 环境，其中包含平台相关包；优先在隔离的旧版 Python 环境中按需安装核心依赖。
 - `BGPgraph` 的 README 给出的参考版本包括 `networkx==2.8.8`、`torch==1.13.1`、`torch_geometric==2.4.0`、`torch-scatter==2.1.2` 和 `pytorch_lightning==2.1.3`。
 - `ISP-Operated` 与 `MSLSTM` 主要依赖 PyTorch、PyTorch Lightning、NumPy 和 scikit-learn；`MSLSTM` 还使用 PyWavelets。
 - `Artemis` 应在 Linux/Kubernetes 环境中通过 Helm 部署，具体要求以其[部署说明](Artemis/README.md)为准。
@@ -99,14 +97,18 @@ python BEAM_engine/train.py \
 
 其余命令和参数见 [BEAM 使用说明](BEAM/readme.md)。
 
-### BGP2Vec 与 BGPvector
+### BGPvector（BGP2Vec）
 
-两个目录都包含 BGP2Vec 代码，但定位略有不同：
+该工程的实际实现位于 `BGPvector/BGP2Vec/`，包含 BGP2Vec 模型、AS 关系分类 Notebook、CAIDA AS 关系样例、预处理数据、预训练 Word2Vec 模型和向量查询脚本。此前重复的根目录 `BGP2Vec/` 已移除。
 
-- `BGP2Vec/` 更接近独立的上游实现，包含数据生成和 AS 关系分类 Notebook；
-- `BGPvector/BGP2Vec/` 额外包含 CAIDA AS 关系样例、预训练 Word2Vec 模型和简单查询脚本。
+`BGP2VEC` 通过 Python 类调用，没有统一的命令行入口。输入通常为 RouteViews OIX 快照，模型创建与加载逻辑位于 [`bgp2vec.py`](BGPvector/BGP2Vec/bgp2vec.py)。如需验证仓库中的预训练向量，可进入 `BGPvector/BGP2Vec/`，确认 Gensim 版本兼容后运行：
 
-`BGP2VEC` 通过 Python 类调用，没有统一的命令行入口。输入通常为 RouteViews OIX 快照，模型创建与加载逻辑位于 [`bgp2vec.py`](BGP2Vec/bgp2vec.py)。如需验证预训练向量，可进入 `BGPvector/BGP2Vec/`，确认 Gensim 版本兼容后运行 `python train_test.py`。
+```bash
+cd BGPvector/BGP2Vec
+python train_test.py
+```
+
+子目录 README 还介绍了 AP2Vec 研究，但当前仓库代码主要是 BGP2Vec 训练、AS 嵌入和 AS 关系分类，并不包含完整、独立的 AP2Vec 检测实现。
 
 ### BGPgraph
 
@@ -154,9 +156,8 @@ BGPgraph 对应 IEEE Transactions on Information Forensics and Security（TIFS�
 | --- | --- |
 | Artemis | Sermpezis et al., *ARTEMIS: Neutralizing BGP Hijacking within a Minute*, IEEE/ACM Transactions on Networking, 2018 |
 | BEAM | Chen et al., *Learning with Semantics: Towards a Semantics-Aware Routing Anomaly Detection System*, USENIX Security, 2024 |
-| BGP2Vec | Shapira and Shavitt, *BGP2Vec: Unveiling the Latent Characteristics of Autonomous Systems*, IEEE TNSM, 2022 |
 | BGPgraph | *GraphBGP: BGP Anomaly Detection and Anomaly Source Localization with Graph Neural Networks*, IEEE Transactions on Information Forensics and Security (TIFS), 2025 |
-| BGPvector | Shapira and Shavitt, *AP2Vec: an Unsupervised Approach for BGP Hijacking Detection*, IEEE TNSM, 2022；当前目录内容以 BGP2Vec 为主 |
+| BGPvector | Shapira and Shavitt, *BGP2Vec: Unveiling the Latent Characteristics of Autonomous Systems*, IEEE TNSM, 2022 |
 | ISP-Operated | Dong et al., *ISP Self-Operated BGP Anomaly Detection Based on Weakly Supervised Learning*, IEEE ICNP, 2021 |
 | MSLSTM | Cheng et al., *Multi-scale LSTM Model for BGP Anomaly Classification*, IEEE Transactions on Services Computing, 2021 |
 
